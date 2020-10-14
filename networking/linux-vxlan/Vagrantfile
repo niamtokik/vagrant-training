@@ -1,0 +1,159 @@
+Vagrant.configure("2") do |config|
+  config.vm.box = "generic/debian10"
+
+  config.vm.provision "shell", inline: <<-SHELL
+    ################################################################## 
+    # update and install few packages
+    ################################################################## 
+    apt-get update
+    apt-get install -y netcat-openbsd ipcalc net-tools arping ethtool
+    apt-get install -y tcpdump tmate
+
+    ################################################################## 
+    # enable forwarding
+    ################################################################## 
+    # enable ipv4 packet forwarding // L3 router only
+    echo 1 > /proc/sys/net/ipv4/ip_forward
+    # enable ipv6
+    echo 0 > /proc/sys/net/ipv6/conf/all/disable_ipv6
+    # enable ipv6 policy
+    echo 0 > /proc/sys/net/ipv6/conf/all/disable_policy
+    # enable ipv6 forwarding // L3 router only
+    echo 1 > /proc/sys/net/ipv6/conf/all/forwarding
+
+    ################################################################## 
+    # create bridge
+    ################################################################## 
+    ip link add bridge0 type bridge
+    ip link set up dev bridge0
+    
+    ################################################################## 
+    # create dedicated namespaces
+    ################################################################## 
+    ip netns add alice
+    ip netns add bob
+    ip netns add charly
+    ip netns add dave
+    ip netns add eve
+
+    ################################################################## 
+    # create virtual interfaces with dedicated peer name
+    ################################################################## 
+    ip link add vetha0 type veth peer name vetha1
+    ip link add vethb0 type veth peer name vethb1
+    ip link add vethc0 type veth peer name vethc1
+    ip link add vethd0 type veth peer name vethd1
+    ip link add vethe0 type veth peer name vethe1
+
+    ################################################################## 
+    # add virtual interface in namespaces
+    ################################################################## 
+    ip link set netns alice dev vetha1
+    ip link set netns bob dev vethb1
+    ip link set netns charly dev vethc1
+    ip link set netns dave dev vethd1
+    ip link set netns eve dev vethe1
+
+    ################################################################## 
+    # activate interfaces and put them in bridge0
+    ################################################################## 
+    ip link set master bridge0 vetha0
+    ip link set master bridge0 vethb0
+    ip link set master bridge0 vethc0
+    ip link set master bridge0 vethd0
+    ip link set master bridge0 vethe0
+    ip link set up dev vetha0
+    ip link set up dev vethb0
+    ip link set up dev vethc0
+    ip link set up dev vethd0
+    ip link set up dev vethe0
+
+    ################################################################## 
+    # set alice namespace
+    ################################################################## 
+    echo "configure alice namespace"
+
+    # enable the link
+    ip -n alice link set up vetha1
+
+    # create a vlan with id 100 linked to vetha1
+    ip -n alice link add link vetha1 name vlan100 type vlan id 100
+
+    # enable vlan100 link
+    ip -n alice link set dev vlan100 up
+    ip -n alice addr add 172.16.0.1/24 dev vlan100
+
+    # print detailed information
+    ip -n alice -d link show vlan100
+
+    # create a new vxlan with id 1000 directly over local interface
+    ip -n alice link add link vetha1 name vxlan1000 type vxlan id 1000 remote 172.16.0.2
+    ip -n alice link set dev vxlan1000 up
+
+    # set 10.0.100.1 address to vxlan1000
+    ip -n alice address add 10.0.100.1/24 dev vxlan1000
+
+    # show information concerning vxlan1000
+    ip -n alice -d link show vxlan1000
+    ip -n alice -d addr show vxlan1000
+
+    # create a new vxlan with id 1001 over vlan100
+    ip -n alice link add link vlan100 name vxlan1001 type vxlan id 1001 remote 172.16.0.2
+    ip -n alice link set dev vxlan1001 up
+
+    # add 10.0.101.1 address to vxlan1001
+    ip -n alice address add 10.0.101.1/24 dev vxlan1001
+
+    # show information concerning vxlan1001
+    ip -n alice -d link show vxlan1001
+    ip -n alice -d addr show vxlan1001
+
+    ip -n alice link add link vetha1 name vlan200 type vlan id 200
+    ip -n alice link set dev vlan200 up
+    ip -n alice -d link show vlan200
+
+    ip -n alice link add link vetha1 name vxlan2000 type vxlan id 2000
+    ip -n alice address add 10.0.200.1/24 dev vxlan2000
+    ip -n alice -d link show vxlan2000
+    ip -n alice -d addr show vxlan2000
+
+    ip -n alice link add link vlan200 name vxlan2001 type vxlan id 2001
+    ip -n alice address add 10.0.201.1/24 dev vxlan2001
+    ip -n alice -d link show vxlan2001
+    ip -n alice -d addr show vxlan2001
+
+    ################################################################## 
+    # set bob namespace
+    ################################################################## 
+    echo "configure bob namespace"
+    ip -n bob link set up vethb1
+    ip -n bob link add link vethb1 name vlan100 type vlan id 100
+    ip -n bob link set up dev vlan100
+    ip -n bob addr add 172.16.0.2/24 dev vlan100
+    ip -n bob -d link show vlan100
+
+    ip -n bob link add link vethb1 name vxlan1000 type vxlan id 1000 remote 172.16.0.1
+    ip -n bob link set dev vxlan1000 up
+    ip -n bob address add 10.0.100.2/24 dev vxlan1000
+    ip -n bob -d link show vxlan1000
+    ip -n bob -d addr show vxlan1000
+
+    ip -n bob link add link vlan100 name vxlan1001 type vxlan id 1001 remote 172.16.0.1
+    ip -n bob link set dev vxlan1001 up
+    ip -n bob address add 10.0.101.2/24 dev vxlan1001
+    ip -n bob -d link show vxlan1001
+    ip -n bob -d addr show vxlan1001
+
+    ################################################################## 
+    # test
+    ################################################################## 
+    # alice to bob
+    ip netns exec alice ping -c 1 10.0.100.2
+    ip netns exec alice ping -c 1 10.0.101.2
+    
+    # bob to alice
+    ip netns exec bob ping -c 1 10.0.100.1
+    ip netns exec bob ping -c 1 10.0.101.1
+
+  SHELL
+end
