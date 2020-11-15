@@ -126,7 +126,7 @@ Vagrant.configure("2") do |config|
     ################################################################## 
     ip -n alice address add 10.1.0.1/24 dev bonda1
     ip -n bob address add 10.1.0.2/24 dev bondb1
-    ip -n charly address add 10.1.0.3/24 dev bondb1
+    ip -n charly address add 10.1.0.3/24 dev bondc1
 
     ################################################################## 
     # test
