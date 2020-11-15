@@ -136,5 +136,13 @@ Vagrant.configure("2") do |config|
     ip netns exec bob ping -c 1 10.1.0.3
     ip netns exec charly ping -c 1 10.1.0.1
 
+    # remove disable one link for eachnamespace
+    ip link set down vetha0
+    ip link set down vethb0
+    ip link set down vethc0
+
+    ip netns exec alice ping -c 1 10.1.0.2
+    ip netns exec bob ping -c 1 10.1.0.3
+    ip netns exec charly ping -c 1 10.1.0.1
   SHELL
 end
