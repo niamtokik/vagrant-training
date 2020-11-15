@@ -29,12 +29,6 @@ Vagrant.configure("2") do |config|
     ip netns add charly
 
     ################################################################## 
-    # create bridge and activate it
-    ################################################################## 
-    ip link add bridge0 type bridge
-    ip link set bridge0 up
-
-    ################################################################## 
     # create virtual interfaces with dedicated peer name
     ################################################################## 
     ip link add vetha0 type veth peer name vetha1
