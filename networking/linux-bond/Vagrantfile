@@ -68,7 +68,7 @@ Vagrant.configure("2") do |config|
     ip -n bob link add bondb1 type bond
 
     ip link add bondc0 type bond
-    ip -n bob link add bondc1 type bond
+    ip -n charly link add bondc1 type bond
 
     ################################################################## 
     # plug interfaces to the the main bridge
@@ -87,7 +87,6 @@ Vagrant.configure("2") do |config|
     ip link set master bondc0 dev vethc2
     ip -n charly link set master bondc1 dev vethc1
     ip -n charly link set master bondc1 dev vethc3
-
 
     ################################################################## 
     # create bridge and plug bond on it
